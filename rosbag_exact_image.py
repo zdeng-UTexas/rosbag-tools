@@ -10,11 +10,18 @@ import pandas as pd
 bag_file = '/home/zd3534/phoenix-r1/bags/2024-08-14-14-12-48.bag'
 image_topics = [
     '/trevor/multisense_forward/aux/image_rect_color',
+    '/trevor/multisense_rear/aux/image_rect_color',
+
     '/trevor/multisense_forward/left/image_rect',
     '/trevor/multisense_forward/right/image_rect',
-    '/trevor/multisense_rear/aux/image_rect_color',
     '/trevor/multisense_rear/left/image_rect',
-    '/trevor/multisense_rear/right/image_rect'
+    '/trevor/multisense_rear/right/image_rect',
+
+    '/trevor/multisense_forward/aux/image_color/compressed',
+    '/trevor/multisense_rear/aux/image_color/compressed',
+
+    '/trevor/stereo_left/image_rect_color/compressed',
+    '/trevor/stereo_right/image_rect_color/compressed'
 ]
 
 # Extract the bag file name
