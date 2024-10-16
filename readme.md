@@ -80,7 +80,7 @@ This section outlines the steps to run the necessary scripts within a Docker con
    ```bash
    mkdir -p /tmp/ros_home
    export ROS_HOME=/tmp/ros_home
-   roscore
+   nohup roscore > /tmp/roscore_nohup.log 2>&1 &
    ```
 
 4. In another terminal, access the container:
@@ -89,11 +89,8 @@ This section outlines the steps to run the necessary scripts within a Docker con
    # List all running containers (optional)
    docker ps
 
-   # Open a bash shell inside the container
-   docker exec -it ros_container bash
-
-   # Alternatively, to run the container as root
-   # docker exec -it --user root ros_container bash
+   # Open a bash shell inside the container as root
+   docker exec -it --user root ros_container bash
    ```
 
 5. Source the ROS environment:
@@ -136,7 +133,7 @@ This section outlines the steps to run the necessary scripts within a Docker con
     tail -f /rosbag-tools/nohup.out
     tail -f /extracted_data/extraction.log
     ```
-```
+
    
 ## License
 
