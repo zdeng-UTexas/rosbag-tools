@@ -2,6 +2,7 @@
 
 import os
 import cv2
+import glob
 import rosbag
 import numpy as np
 import pandas as pd
@@ -224,12 +225,28 @@ def interpolate_gps_for_images(base_output_dir, image_folders, navpvt_csv_path):
     print("Interpolation complete.")
 
 def main():
+
     # List of bag files
-    bag_files = [
-        '/home/zd3534/phoenix-r1/bags/2024-08-14-14-12-48.bag',
-        '/home/zd3534/phoenix-r1/bags/2024-08-14-14-25-35.bag',
-        '/home/zd3534/phoenix-r1/bags/2024-08-14-13-35-39.bag'
+    # bag_files = [
+    #     '/home/zd3534/phoenix-r1/bags/2024-08-14-14-12-48.bag',
+    #     '/home/zd3534/phoenix-r1/bags/2024-08-14-14-25-35.bag',
+    #     '/home/zd3534/phoenix-r1/bags/2024-08-14-13-35-39.bag'
+    # ]
+
+    # Path to the directory containing bag files
+    # -v /robodata/ARL_SARA/GQ-dataset/bagfiles:/rosbags \
+    bag_files_dir = '/rosbags'
+    
+    # List all .bag files in the /rosbags directory
+    bag_files = glob.glob(os.path.join(bag_files_dir, '*.bag'))
+
+    # Add any additional specific bag files from different locations
+    specific_bag_files = [
+        # '/some/other/path/to/specific_bag_1.bag',
     ]
+    
+    # Combine both lists of bag files
+    bag_files.extend(specific_bag_files)
 
     # Image topics
     image_topics = [
@@ -237,8 +254,8 @@ def main():
         '/trevor/multisense_rear/aux/image_color/compressed',
         '/trevor/stereo_left/image_rect_color/compressed',
         '/trevor/stereo_right/image_rect_color/compressed',
-        # '/trevor/multisense_forward/aux/image_rect_color',
-        # '/trevor/multisense_rear/aux/image_rect_color',
+        '/trevor/multisense_forward/aux/image_rect_color',
+        '/trevor/multisense_rear/aux/image_rect_color',
         '/trevor/multisense_forward/left/image_rect',
         '/trevor/multisense_forward/right/image_rect',
         '/trevor/multisense_rear/left/image_rect',
@@ -252,13 +269,17 @@ def main():
         '/trevor/ublox/fix_velocity'
     ]
 
+    # Base directory where extracted data will be stored
+    # The extracted_data_base_dir is set to /extracted_data, which is mounted to /robodata/ARL_SARA/GQ-dataset/extracted_data on the host.
+    extracted_data_base_dir = '/extracted_data'
+    
     # For each bag file
     for bag_file in bag_files:
         # Extract the bag file name
         bag_name = os.path.splitext(os.path.basename(bag_file))[0]
 
         # Base output directory
-        base_output_dir = os.path.join(os.path.dirname(bag_file), f'rosbag_{bag_name}')
+        base_output_dir = os.path.join(extracted_data_base_dir, f'rosbag_{bag_name}')
 
         # Create the base output directory if it doesn't exist
         if not os.path.exists(base_output_dir):

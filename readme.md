@@ -45,6 +45,100 @@ For more details, refer to the official NumPy release notes: https://numpy.org/d
 - **rosbag_exact_image.py**: A script to extract only image data from ROS bag files.
 - **rosbag_interpolate_gps_for_image.py**: A script to interpolate GPS data to match image timestamps.
 
+
+Here's an improved version of the markdown formatted for direct use on GitHub:
+
+
+# Run within ROS Docker
+
+This section outlines the steps to run the necessary scripts within a Docker container with ROS installed.
+
+## Prepare the Container
+
+1. Stop and remove any existing containers to avoid conflicts:
+
+   ```bash
+   docker stop ros_container
+   docker rm ros_container
+   ```
+
+2. Start the ROS container with the required volumes:
+
+   ```bash
+   docker run -it --name ros_container \
+   -v /robodata/ARL_SARA/GQ-dataset/bagfiles:/rosbags \
+   -v /home/zhiyundeng/rosbag-tools:/rosbag-tools \
+   -v /robodata/ARL_SARA/GQ-dataset/extracted_data:/extracted_data \
+   --user $(id -u):$(id -g) \
+   osrf/ros:noetic-desktop-full
+   ```
+
+## Set Up ROS Environment
+
+3. In one terminal, create a temporary ROS home directory and start the ROS master:
+
+   ```bash
+   mkdir -p /tmp/ros_home
+   export ROS_HOME=/tmp/ros_home
+   roscore
+   ```
+
+4. In another terminal, access the container:
+
+   ```bash
+   # List all running containers (optional)
+   docker ps
+
+   # Open a bash shell inside the container
+   docker exec -it ros_container bash
+
+   # Alternatively, to run the container as root
+   # docker exec -it --user root ros_container bash
+   ```
+
+5. Source the ROS environment:
+
+   ```bash
+   source /opt/ros/noetic/setup.bash
+   ```
+
+## Working with ROS Bags
+
+6. Check the information of a ROS bag file:
+
+   ```bash
+   rosbag info /rosbags/2024-08-12-11-32-46.bag
+   ```
+
+7. Save the rosbag info into a text file:
+
+   ```bash
+   ./save_rosbag_info_into_txt.sh
+   ```
+
+8. Extract dataset information from ROS bags:
+
+   ```bash
+   nohup python3 rosbag_extract_dataset.py &
+   ```
+
+## Monitoring
+
+9. Check the status of the running Python script:
+
+   ```bash
+   ps aux | grep rosbag_extract_dataset.py
+   ```
+
+10. Display the output of the running script:
+
+    ```bash
+    tail -f /rosbag-tools/nohup.out
+    tail -f /extracted_data/extraction.log
+    ```
+```
+   
 ## License
 
 This project is open-source and available under the MIT License.
+
