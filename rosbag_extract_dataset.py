@@ -27,8 +27,17 @@ def extract_images(bag_file, base_output_dir, image_topics):
             output_dir = os.path.join(base_output_dir, image_topic_sanitized)
             os.makedirs(output_dir, exist_ok=True)
 
+            # Skip processing if images have already been extracted
+            image_csv_path = os.path.join(output_dir, f"{image_topic_sanitized}_timestamps.csv")
+            if os.path.exists(image_csv_path):
+                logging.info(f"Images for topic {image_topic} already extracted. Skipping.")
+                continue
+
             image_data = []
             total_messages = bag.get_message_count(topic_filters=[image_topic])
+            if total_messages == 0:
+                logging.info(f"No messages found for topic {image_topic}.")
+                continue
 
             for topic, msg, t in tqdm(bag.read_messages(topics=[image_topic]), total=total_messages, desc=f"Extracting {image_topic_sanitized}"):
                 try:
@@ -55,7 +64,6 @@ def extract_images(bag_file, base_output_dir, image_topics):
             # Save image data to CSV
             if image_data:
                 image_df = pd.DataFrame(image_data)
-                image_csv_path = os.path.join(output_dir, f"{image_topic_sanitized}_timestamps.csv")
                 image_df.to_csv(image_csv_path, index=False)
                 logging.info(f"Extracted {len(image_data)} images from topic {image_topic} to {output_dir}")
             else:
@@ -63,64 +71,23 @@ def extract_images(bag_file, base_output_dir, image_topics):
 
     logging.info(f"Image extraction from {bag_file} complete.")
 
-def extract_gps(bag_file, base_output_dir, gps_topics):
-    navpvt_data = []
+def extract_gps_fix(bag_file, base_output_dir):
     fix_data = []
-    fix_velocity_data = []
 
     with rosbag.Bag(bag_file, 'r') as bag:
-        for topic, msg, t in bag.read_messages(topics=gps_topics):
+        for topic, msg, t in bag.read_messages(topics=['/trevor/ublox/fix']):
             timestamp = msg.header.stamp.to_sec() if hasattr(msg, 'header') and msg.header.stamp else t.to_sec()
 
-            if topic == '/trevor/ublox/navpvt':
-                navpvt_entry = {
-                    'timestamp': timestamp,
-                    'lat': msg.lat * 1e-7,
-                    'lon': msg.lon * 1e-7,
-                    'height': msg.height * 1e-3,
-                    'hMSL': msg.hMSL * 1e-3,
-                    'hAcc': msg.hAcc * 1e-3,
-                    'vAcc': msg.vAcc * 1e-3,
-                    'velN': msg.velN * 1e-3,
-                    'velE': msg.velE * 1e-3,
-                    'velD': msg.velD * 1e-3,
-                    'gSpeed': msg.gSpeed * 1e-3,
-                    'heading': msg.heading * 1e-5,
-                    'sAcc': msg.sAcc * 1e-3,
-                    'headAcc': msg.headAcc * 1e-5
-                }
-                navpvt_data.append(navpvt_entry)
-            elif topic == '/trevor/ublox/fix':
-                fix_entry = {
-                    'timestamp': timestamp,
-                    'latitude': msg.latitude,
-                    'longitude': msg.longitude,
-                    'altitude': msg.altitude,
-                    'position_covariance': msg.position_covariance,
-                    'status': msg.status.status,
-                    'service': msg.status.service
-                }
-                fix_data.append(fix_entry)
-            elif topic == '/trevor/ublox/fix_velocity':
-                fix_velocity_entry = {
-                    'timestamp': timestamp,
-                    'linear_x': msg.twist.twist.linear.x,
-                    'linear_y': msg.twist.twist.linear.y,
-                    'linear_z': msg.twist.twist.linear.z,
-                    'angular_x': msg.twist.twist.angular.x,
-                    'angular_y': msg.twist.twist.angular.y,
-                    'angular_z': msg.twist.twist.angular.z,
-                    'covariance': msg.twist.covariance
-                }
-                fix_velocity_data.append(fix_velocity_entry)
-
-    if navpvt_data:
-        navpvt_df = pd.DataFrame(navpvt_data)
-        navpvt_csv_path = os.path.join(base_output_dir, 'navpvt_data.csv')
-        navpvt_df.to_csv(navpvt_csv_path, index=False)
-        logging.info(f"Saved NavPVT data to {navpvt_csv_path}")
-    else:
-        logging.info("No NavPVT data found.")
+            fix_entry = {
+                'timestamp': timestamp,
+                'latitude': msg.latitude,
+                'longitude': msg.longitude,
+                'altitude': msg.altitude,
+                'position_covariance': msg.position_covariance,
+                'status': msg.status.status,
+                'service': msg.status.service
+            }
+            fix_data.append(fix_entry)
 
     if fix_data:
         fix_df = pd.DataFrame(fix_data)
@@ -130,23 +97,24 @@ def extract_gps(bag_file, base_output_dir, gps_topics):
     else:
         logging.info("No Fix data found.")
 
-    if fix_velocity_data:
-        fix_velocity_df = pd.DataFrame(fix_velocity_data)
-        fix_velocity_csv_path = os.path.join(base_output_dir, 'fix_velocity_data.csv')
-        fix_velocity_df.to_csv(fix_velocity_csv_path, index=False)
-        logging.info(f"Saved Fix Velocity data to {fix_velocity_csv_path}")
-    else:
-        logging.info("No Fix Velocity data found.")
+    logging.info(f"GPS Fix data extraction from {bag_file} complete.")
+    return fix_data
 
-    logging.info(f"GPS data extraction from {bag_file} complete.")
+def interpolate_gps_for_images(base_output_dir, image_folders, fix_data):
+    if len(fix_data) == 0:
+        logging.info("Fix data is empty, skipping interpolation.")
+        return
 
-def interpolate_gps_for_images(base_output_dir, image_folders, navpvt_csv_path):
-    navpvt_df = pd.read_csv(navpvt_csv_path)
-    navpvt_df['timestamp'] = navpvt_df['timestamp'].astype(float)
-    navpvt_df.sort_values('timestamp', inplace=True)
+    fix_df = pd.DataFrame(fix_data)
+    fix_df['timestamp'] = fix_df['timestamp'].astype(float)
+    fix_df.sort_values('timestamp', inplace=True)
 
     for folder in image_folders:
         image_folder_path = os.path.join(base_output_dir, folder)
+        if not os.path.exists(image_folder_path):
+            logging.info(f"Image folder {image_folder_path} does not exist, skipping.")
+            continue
+
         image_files = sorted([f for f in os.listdir(image_folder_path) if f.endswith('.jpg')])
 
         image_timestamps = []
@@ -162,11 +130,11 @@ def interpolate_gps_for_images(base_output_dir, image_folders, navpvt_csv_path):
             continue
 
         interpolated_gps_data = []
-        timestamps_navpvt = navpvt_df['timestamp'].values
-        columns_to_interpolate = ['lat', 'lon', 'height', 'hMSL', 'hAcc', 'vAcc', 'velN', 'velE', 'velD', 'gSpeed', 'heading', 'sAcc', 'headAcc']
+        timestamps_fix = fix_df['timestamp'].values
+        columns_to_interpolate = ['latitude', 'longitude', 'altitude']
 
         for timestamp in image_timestamps:
-            interpolated_values = {col: np.interp(timestamp, timestamps_navpvt, navpvt_df[col].values) for col in columns_to_interpolate}
+            interpolated_values = {col: np.interp(timestamp, timestamps_fix, fix_df[col].values) for col in columns_to_interpolate}
             interpolated_data_entry = {'timestamp': timestamp}
             interpolated_data_entry.update(interpolated_values)
             interpolated_gps_data.append(interpolated_data_entry)
@@ -186,42 +154,43 @@ def main():
 
     image_topics = [
         '/trevor/multisense_forward/aux/image_color/compressed',
-        '/trevor/multisense_rear/aux/image_color/compressed',
-        '/trevor/stereo_left/image_rect_color/compressed',
-        '/trevor/stereo_right/image_rect_color/compressed',
-        '/trevor/multisense_forward/aux/image_rect_color',
-        '/trevor/multisense_rear/aux/image_rect_color',
-        '/trevor/multisense_forward/left/image_rect',
-        '/trevor/multisense_forward/right/image_rect',
-        '/trevor/multisense_rear/left/image_rect',
-        '/trevor/multisense_rear/right/image_rect'
+        # '/trevor/multisense_rear/aux/image_color/compressed',
+        # '/trevor/stereo_left/image_rect_color/compressed',
+        # '/trevor/stereo_right/image_rect_color/compressed',
+        # '/trevor/multisense_forward/aux/image_rect_color',
+        # '/trevor/multisense_rear/aux/image_rect_color',
+        # '/trevor/multisense_forward/left/image_rect',
+        # '/trevor/multisense_forward/right/image_rect',
+        # '/trevor/multisense_rear/left/image_rect',
+        # '/trevor/multisense_rear/right/image_rect'
     ]
 
-    gps_topics = [
-        '/trevor/ublox/navpvt',
-        '/trevor/ublox/fix',
-        '/trevor/ublox/fix_velocity'
-    ]
-
+    # Use only the /trevor/ublox/fix topic for GPS data
     extracted_data_base_dir = '/extracted_data'
-    
+
     for bag_file in tqdm(bag_files, desc="Processing bag files"):
         bag_name = os.path.splitext(os.path.basename(bag_file))[0]
         base_output_dir = os.path.join(extracted_data_base_dir, f'rosbag_{bag_name}')
-        os.makedirs(base_output_dir, exist_ok=True)
 
+        # Check if processing is already complete
+        completion_marker = os.path.join(base_output_dir, 'processing_complete.txt')
+        if os.path.exists(completion_marker):
+            logging.info(f"Bag file {bag_file} has already been processed. Skipping.")
+            continue
+
+        os.makedirs(base_output_dir, exist_ok=True)
         logging.info(f"Processing bag file: {bag_file}")
 
         extract_images(bag_file, base_output_dir, image_topics)
-        extract_gps(bag_file, base_output_dir, gps_topics)
+        fix_data = extract_gps_fix(bag_file, base_output_dir)
 
         image_folders = [image_topic.replace('/', '_').strip('_') for image_topic in image_topics]
-        navpvt_csv_path = os.path.join(base_output_dir, 'navpvt_data.csv')
+        interpolate_gps_for_images(base_output_dir, image_folders, fix_data)
 
-        if os.path.exists(navpvt_csv_path):
-            interpolate_gps_for_images(base_output_dir, image_folders, navpvt_csv_path)
-        else:
-            logging.info(f"NavPVT CSV data not found at {navpvt_csv_path}, skipping interpolation.")
+        # Create a completion marker
+        with open(completion_marker, 'w') as f:
+            f.write('Processing complete.\n')
+        logging.info(f"Finished processing bag file: {bag_file}")
 
     logging.info("Processing complete.")
 
