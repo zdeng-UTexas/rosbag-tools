@@ -80,7 +80,7 @@ This section outlines the steps to run the necessary scripts within a Docker con
    ```bash
    mkdir -p /tmp/ros_home
    export ROS_HOME=/tmp/ros_home
-   nohup roscore > roscore_nohup.log 2>&1 &
+   nohup roscore > /tmp/roscore_nohup.log 2>&1 &
    ```
 
 4. In another terminal, access the container:
