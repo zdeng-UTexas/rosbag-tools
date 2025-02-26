@@ -33,10 +33,10 @@ def extract_odometry_data(bag_file, output_csv):
 if __name__ == '__main__':
     # Path to your bag file
     # bag_file = '/home/zd3534/phoenix-r1/bags/2024-08-14-14-12-48.bag'
-    bag_file = '/home/zd3534/phoenix-r1/bags/2024-08-14-14-25-35.bag'
+    bag_file = '/robodata/ARL_SARA/GQ-dataset/bagfiles/2024-08-13-16-45-06.bag'
     # Path to output CSV file
     # output_csv = '/home/zd3534/phoenix-r1/bags/odometry_2024-08-14-14-12-48.csv'
-    output_csv = '/home/zd3534/phoenix-r1/bags/odometry_2024-08-14-14-25-35.csv'
+    output_csv = '/robodata/ARL_SARA/GQ-dataset/extracted_data/rosbag_2024-08-13-16-45-06/odometry_2024-08-13-16-45-06.csv'
 
     # Call the extraction function
     extract_odometry_data(bag_file, output_csv)

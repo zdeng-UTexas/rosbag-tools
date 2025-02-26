@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 # Configure logging
 logging.basicConfig(
-    filename='/extracted_data/extraction.log',
+    filename='/robodata/ARL_SARA/GQ-dataset/extracted_data/extraction.log',
     filemode='a',
     format='%(asctime)s %(levelname)s:%(message)s',
     level=logging.INFO
@@ -100,6 +100,37 @@ def extract_gps_fix(bag_file, base_output_dir):
     logging.info(f"GPS Fix data extraction from {bag_file} complete.")
     return fix_data
 
+def extract_odometry(bag_file, base_output_dir):
+    odom_data = []
+
+    with rosbag.Bag(bag_file, 'r') as bag:
+        for topic, msg, t in bag.read_messages(topics=['/trevor/odom']):
+            timestamp = msg.header.stamp.to_sec() if hasattr(msg, 'header') and msg.header.stamp else t.to_sec()
+
+            # Extract Odometry data: position (x, y, z) and orientation (qx, qy, qz, qw)
+            odom_entry = {
+                'timestamp': timestamp,
+                'x': msg.pose.pose.position.x,
+                'y': msg.pose.pose.position.y,
+                'z': msg.pose.pose.position.z,
+                'qx': msg.pose.pose.orientation.x,
+                'qy': msg.pose.pose.orientation.y,
+                'qz': msg.pose.pose.orientation.z,
+                'qw': msg.pose.pose.orientation.w
+            }
+            odom_data.append(odom_entry)
+
+    if odom_data:
+        odom_df = pd.DataFrame(odom_data)
+        odom_csv_path = os.path.join(base_output_dir, 'odom_data.csv')
+        odom_df.to_csv(odom_csv_path, index=False)
+        logging.info(f"Saved Odometry data to {odom_csv_path}")
+    else:
+        logging.info("No Odometry data found.")
+
+    logging.info(f"Odometry data extraction from {bag_file} complete.")
+    return odom_data
+
 def interpolate_gps_for_images(base_output_dir, image_folders, fix_data):
     if len(fix_data) == 0:
         logging.info("Fix data is empty, skipping interpolation.")
@@ -147,17 +178,17 @@ def interpolate_gps_for_images(base_output_dir, image_folders, fix_data):
     logging.info("Interpolation complete.")
 
 def main():
-    bag_files_dir = '/rosbags'
+    bag_files_dir = '/robodata/ARL_SARA/GQ-dataset/bagfiles'
     bag_files = glob.glob(os.path.join(bag_files_dir, '*.bag'))
     specific_bag_files = []
     bag_files.extend(specific_bag_files)
 
     image_topics = [
-        '/trevor/multisense_forward/aux/image_color/compressed',
+        # '/trevor/multisense_forward/aux/image_color/compressed',
         # '/trevor/multisense_rear/aux/image_color/compressed',
         # '/trevor/stereo_left/image_rect_color/compressed',
         # '/trevor/stereo_right/image_rect_color/compressed',
-        # '/trevor/multisense_forward/aux/image_rect_color',
+        '/trevor/multisense_forward/aux/image_rect_color',
         # '/trevor/multisense_rear/aux/image_rect_color',
         # '/trevor/multisense_forward/left/image_rect',
         # '/trevor/multisense_forward/right/image_rect',
@@ -183,6 +214,7 @@ def main():
 
         extract_images(bag_file, base_output_dir, image_topics)
         fix_data = extract_gps_fix(bag_file, base_output_dir)
+        odom_data = extract_odometry(bag_file, base_output_dir)
 
         image_folders = [image_topic.replace('/', '_').strip('_') for image_topic in image_topics]
         interpolate_gps_for_images(base_output_dir, image_folders, fix_data)

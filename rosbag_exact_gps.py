@@ -5,7 +5,7 @@ import os
 import pandas as pd
 
 # Input parameters
-bag_file = '/home/zd3534/phoenix-r1/bags/2024-08-14-14-12-48.bag'
+bag_file = '/home/zd3534/phoenix-r1/bags/2024-08-13-12-05-41.bag'
 
 gps_topics = [
     '/trevor/ublox/navpvt',
